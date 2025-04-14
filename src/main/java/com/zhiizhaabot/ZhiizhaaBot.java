@@ -73,24 +73,19 @@ public class ZhiizhaaBot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText().trim();
             Long chatId = update.getMessage().getChatId();
-            String userName = update.getMessage().getFrom().getFirstName(); // Получаем имя пользователя
 
             if ("/start".equals(messageText)) {
-                String greeting = chatId == 123456789L ? "Привет, Миша! 👋" : "Привет, " + userName + "! 👋"; // Приветствует вас по ID, остальных по имени
-
                 userState.put(chatId, "menu");
-                sendTextMessage(chatId, greeting + "\nВыберите действие:\n" +
-                        "1️⃣ /calculate - Округлить число\n" +
-                        "2️⃣ /list - Просмотреть справочник");
-            } else if ("menu".equals(userState.get(chatId))) {
-                if ("/calculate".equals(messageText)) {
-                    userState.put(chatId, "calculate");
-                    sendTextMessage(chatId, "🔢 **Режим округления** активирован!\nПросто вводите числа, и я буду их округлять. Для выхода используйте `/start`.");
-                } else if ("/list".equals(messageText)) {
-                    userState.put(chatId, "guide");
-                    sendTextMessage(chatId, CommandProcessor.getCategories());
+                sendTextMessage(chatId, "Привет, Миша! 👋\n" + MenuManager.getMainMenu());
+            } else if ("/list".equals(messageText)) {
+                sendTextMessage(chatId, MenuManager.getCategories());
+            } else {
+                // Проверяем, является ли команда одной из зарегистрированных
+                String response = CommandProcessor.getCommandResponse(messageText);
+                if (response != null) {
+                    sendTextMessage(chatId, response);
                 } else {
-                    sendTextMessage(chatId, "❌ Неверный ввод. Введите `/start` для главного меню.");
+                    sendTextMessage(chatId, "❌ Неизвестная команда. Введите /list для справочника.");
                 }
             }
         }
