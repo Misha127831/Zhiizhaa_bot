@@ -2,9 +2,10 @@ package com.zhiizhaabot;
 
 public class MenuManager {
     public static String getMainMenu() {
-        return "**🚀 Выберите действие:**\n" +
+        return "\\*\\*🚀 Выберите действие:\\*\\*\n\n" +
                 "1️⃣ /calculate — Округлить число\n" +
-                "2️⃣ /list — Просмотреть справочник";
+                "2️⃣ /list — Просмотреть справочник\n" +
+                "3️⃣ /count_liquids — 📊 Подсчитать жидкости";
     }
 
     public static String getCategories() {

@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
+import com.zhiizhaabot.LiquidCounter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,18 +75,29 @@ public class ZhiizhaaBot extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText().trim();
             Long chatId = update.getMessage().getChatId();
 
+            String state = userState.getOrDefault(chatId, "menu");
+
             if ("/start".equals(messageText)) {
                 userState.put(chatId, "menu");
-                sendTextMessage(chatId, "Привет, Миша! 👋\n" + MenuManager.getMainMenu());
-            } else if ("/list".equals(messageText)) {
-                sendTextMessage(chatId, MenuManager.getCategories());
+                System.out.println("Команда `/start` получена. Статус: " + userState.get(chatId));
+
+                String menuText = MenuManager.getMainMenu();
+                System.out.println("Текст меню: " + menuText);
+
+                sendTextMessage(chatId, "Привет, Миша! 👋\n" + menuText);
+            } else if ("/count_liquids".equals(messageText)) {
+                userState.put(chatId, "count_liquids");
+                sendTextMessage(chatId, "📊 **Режим подсчета жидкостей** активирован\nВведите список жидкостей, и я их подсчитаю.");
+            } else if ("count_liquids".equals(state)) {
+                List<String> lines = List.of(messageText.split("\n"));
+                int result = LiquidCounter.countLiquids(lines);
+                sendTextMessage(chatId, "🔢 **Общее количество жидкостей: " + result + "**\nВведите новый список или используйте `/start`, чтобы выйти.");
             } else {
-                // Проверяем, является ли команда одной из зарегистрированных
                 String response = CommandProcessor.getCommandResponse(messageText);
                 if (response != null) {
                     sendTextMessage(chatId, response);
                 } else {
-                    sendTextMessage(chatId, "❌ Неизвестная команда. Введите /list для справочника.");
+                    sendTextMessage(chatId, "❌ Неизвестная команда. Введите `/list` для справочника.");
                 }
             }
         }
@@ -94,8 +106,20 @@ public class ZhiizhaaBot extends TelegramLongPollingBot {
     private void sendTextMessage(Long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
+
+        // 🚀 Экранируем спецсимволы для Telegram MarkdownV2
+        text = text.replace("!", "\\!")
+                .replace(".", "\\.")
+                .replace("-", "\\-")
+                .replace("_", "\\_")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("(", "\\(")
+                .replace(")", "\\)");
+
         message.setText(text);
-        message.setParseMode("Markdown");
+        message.setParseMode("MarkdownV2");
+
         try {
             execute(message);
         } catch (TelegramApiException e) {
