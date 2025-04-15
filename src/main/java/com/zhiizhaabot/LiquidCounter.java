@@ -8,7 +8,8 @@ public class LiquidCounter {
 
         for (String line : lines) {
             if (line == null || line.trim().isEmpty()) {
-                continue; // Пропускаем пустые строки
+                total += 1; // Пустая строка считается как одна жидкость
+                continue;
             }
 
             String[] words = line.split("\\s+"); // Разбиваем строку на слова
@@ -16,16 +17,16 @@ public class LiquidCounter {
 
             for (String word : words) {
                 try {
-                    int number = Integer.parseInt(word);
-                    total += number; // Если нашли число — прибавляем
+                    int number = Integer.parseInt(word); // Если найдено число
+                    total += number; // Добавляем это число в общий подсчёт
                     hasNumber = true;
                 } catch (NumberFormatException ignored) {
-                    // Игнорируем ошибки парсинга
+                    // Если не число, пропускаем
                 }
             }
 
             if (!hasNumber) {
-                total += 1; // Если числа нет, но есть текст — добавляем 1
+                total += 1; // Если числа нет, считаем строку как одну жидкость
             }
         }
 

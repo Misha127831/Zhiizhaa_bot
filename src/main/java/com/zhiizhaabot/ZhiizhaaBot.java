@@ -1,24 +1,21 @@
 package com.zhiizhaabot;
 
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.TelegramBotsApi;
-import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
-import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
-import com.zhiizhaabot.LiquidCounter;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 public class ZhiizhaaBot extends TelegramLongPollingBot {
 
-    private final Map<Long, String> userState = new HashMap<>(); // Запоминаем состояние пользователя
+    private final Map<Long, String> userState = new HashMap<>(); // Состояние пользователя
+    private final Map<Long, List<String>> userLiquidData = new HashMap<>(); // Хранилище жидкостей
 
     @Override
     public String getBotUsername() {
@@ -30,100 +27,123 @@ public class ZhiizhaaBot extends TelegramLongPollingBot {
         return Config.getBotToken();
     }
 
-    public static void main(String[] args) throws TelegramApiException {
-        TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-        ZhiizhaaBot bot = new ZhiizhaaBot();
-        botsApi.registerBot(bot);
-        bot.registerBotCommands(); // Регистрируем команды
-        System.out.println("✅ Бот запущен!");
-    }
+    @Override
+    public void onUpdateReceived(Update update) {
+        Long chatId = update.getMessage() != null ? update.getMessage().getChatId() : update.getCallbackQuery().getMessage().getChatId();
 
-    public void registerBotCommands() {
-        List<BotCommand> commandList = new ArrayList<>();
-        commandList.add(new BotCommand("/start", "Запустить бота"));
-        commandList.add(new BotCommand("/calculate", "Округлить число"));
-        commandList.add(new BotCommand("/list", "Просмотреть справочник"));
-        commandList.add(new BotCommand("/chaser", "Инфо о Chaser"));
-        commandList.add(new BotCommand("/alchemist", "Инфо о Alchemist"));
-        commandList.add(new BotCommand("/nova", "Инфо о NOVA"));
-        commandList.add(new BotCommand("/deadhorse", "Инфо о Dead Horse"));
-        commandList.add(new BotCommand("/fl350mini", "Инфо о FL350 Mini"));
-        commandList.add(new BotCommand("/flavorlab", "Инфо о Flavorlab"));
-        commandList.add(new BotCommand("/flavorlabdisposablepuff", "Инфо о Disposable Puff"));
-        commandList.add(new BotCommand("/fluffypuff", "Инфо о Fluffy Puff"));
-        commandList.add(new BotCommand("/octobar", "Инфо о Octobar"));
-        commandList.add(new BotCommand("/wickwire", "Инфо о Wick & Wire"));
-        commandList.add(new BotCommand("/lucky", "Инфо о Lucky"));
-        commandList.add(new BotCommand("/vapeshot", "Инфо о Vape Shot"));
-        commandList.add(new BotCommand("/punch7ml", "Инфо о Punch 7ml"));
-        commandList.add(new BotCommand("/punch14ml", "Инфо о Punch 14ml"));
-        commandList.add(new BotCommand("/marvellous7ml", "Инфо о Flamingo 7ml"));
-        commandList.add(new BotCommand("/marvellous15ml", "Инфо о Flamingo 15ml"));
-        commandList.add(new BotCommand("/steampuff", "Инфо о SteamPuff"));
-        commandList.add(new BotCommand("/inbottle", "Инфо о InBottle"));
-
-        try {
-            this.execute(new SetMyCommands(commandList, new BotCommandScopeDefault(), null));
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            handleMessage(update.getMessage().getText().trim(), chatId, update.getMessage().getFrom().getFirstName());
+        } else if (update.hasCallbackQuery()) {
+            handleCallback(update.getCallbackQuery().getData(), chatId, update.getCallbackQuery().getFrom().getFirstName());
         }
     }
 
-    @Override
-    public void onUpdateReceived(Update update) {
-        if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText().trim();
-            Long chatId = update.getMessage().getChatId();
-
-            String state = userState.getOrDefault(chatId, "menu");
-
-            if ("/start".equals(messageText)) {
-                userState.put(chatId, "menu");
-                System.out.println("Команда `/start` получена. Статус: " + userState.get(chatId));
-
-                String menuText = MenuManager.getMainMenu();
-                System.out.println("Текст меню: " + menuText);
-
-                sendTextMessage(chatId, "Привет, Миша! 👋\n" + menuText);
-            } else if ("/count_liquids".equals(messageText)) {
-                userState.put(chatId, "count_liquids");
-                sendTextMessage(chatId, "📊 **Режим подсчета жидкостей** активирован\nВведите список жидкостей, и я их подсчитаю.");
-            } else if ("count_liquids".equals(state)) {
-                List<String> lines = List.of(messageText.split("\n"));
-                int result = LiquidCounter.countLiquids(lines);
-                sendTextMessage(chatId, "🔢 **Общее количество жидкостей: " + result + "**\nВведите новый список или используйте `/start`, чтобы выйти.");
+    private void handleMessage(String messageText, Long chatId, String userName) {
+        if ("calculate".equals(userState.get(chatId))) {
+            if ("/exit".equals(messageText)) {
+                userState.remove(chatId);
+                sendTextMessage(chatId, "🚪 Режим округления выключен. Возвращаюсь в главное меню.");
+                sendMenuMessage(chatId, userName);
             } else {
-                String response = CommandProcessor.getCommandResponse(messageText);
-                if (response != null) {
-                    sendTextMessage(chatId, response);
-                } else {
-                    sendTextMessage(chatId, "❌ Неизвестная команда. Введите `/list` для справочника.");
-                }
+                handleCalculation(messageText, chatId);
             }
+        } else if ("count_liquids".equals(userState.get(chatId))) {
+            handleLiquidCount(messageText, chatId);
+        } else if ("/start".equals(messageText)) {
+            userState.remove(chatId);
+            sendMenuMessage(chatId, userName);
+        } else {
+            String response = CommandProcessor.getCommandResponse(messageText); // Получаем ответ команды
+            sendTextMessage(chatId, response);
+        }
+    }
+
+    private void handleCallback(String callbackData, Long chatId, String userName) {
+        switch (callbackData) {
+            case "/calculate":
+                userState.put(chatId, "calculate");
+                sendTextMessage(chatId, "🔢 Введите число для округления.\n✏ Вы можете вводить числа, пока не выйдете командой /exit.");
+                break;
+            case "/count_liquids":
+                userState.put(chatId, "count_liquids");
+                userLiquidData.put(chatId, new ArrayList<>());
+                sendTextMessage(chatId, "📊 Введите список жидкостей (одно на строку), затем напишите /done.");
+                break;
+            case "/list":
+                String categories = CommandProcessor.getCategories(); // Получаем текст справочника
+                if (categories != null && !categories.isEmpty()) {
+                    sendTextMessage(chatId, categories);
+                } else {
+                    sendTextMessage(chatId, "❌ Справочник пуст или не загружен. Проверьте код.");
+                }
+                break;
+            case "/start":
+                userState.remove(chatId);
+                sendMenuMessage(chatId, userName);
+                break;
+        }
+    }
+
+    private void handleLiquidCount(String messageText, Long chatId) {
+        if ("/done".equals(messageText)) {
+            List<String> userInput = userLiquidData.get(chatId);
+            int totalLiquids = LiquidCounter.countLiquids(userInput);
+            sendTextMessage(chatId, "📊 Итоговый подсчёт жидкостей: " + totalLiquids);
+            userLiquidData.remove(chatId); // Очищаем данные после подсчёта
+            userState.remove(chatId); // Выходим из режима
+        } else {
+            userLiquidData.get(chatId).add(messageText);
+            sendTextMessage(chatId, "✅ Добавлено: " + messageText + "\n✏ Введите следующую жидкость или напишите /done.");
+        }
+    }
+
+    private void handleCalculation(String messageText, Long chatId) {
+        try {
+            double number = Double.parseDouble(messageText);
+            long roundedResult = RoundNumber.process(number);
+            sendTextMessage(chatId, "🔢 Число после прибавления 3% и округления: " + roundedResult + "\n✏ Введите следующее число или /exit для выхода.");
+        } catch (NumberFormatException e) {
+            sendTextMessage(chatId, "❌ Ошибка: введите корректное число.");
         }
     }
 
     private void sendTextMessage(Long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-
-        // 🚀 Экранируем спецсимволы для Telegram MarkdownV2
-        text = text.replace("!", "\\!")
-                .replace(".", "\\.")
-                .replace("-", "\\-")
-                .replace("_", "\\_")
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replace("(", "\\(")
-                .replace(")", "\\)");
-
         message.setText(text);
-        message.setParseMode("MarkdownV2");
 
         try {
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    private void sendMenuMessage(Long chatId, String userName) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("👋 Привет, " + userName + "! Выберите действие:");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        rows.add(List.of(createButton("Округлить число", "/calculate"), createButton("Справочник", "/list")));
+        rows.add(List.of(createButton("📊 Подсчитать жидкости", "/count_liquids")));
+
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private InlineKeyboardButton createButton(String text, String callbackData) {
+        InlineKeyboardButton button = new InlineKeyboardButton();
+        button.setText(text);
+        button.setCallbackData(callbackData);
+        return button;
     }
 }
